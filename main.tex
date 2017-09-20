@@ -88,6 +88,15 @@ This kind of signal would normally be close to useless, as each additional layer
 This unfortunately only provides some small amount of protection here, as the attacker still has plenty of ways of altering the sensor data without disrupting the watermarking signal.
 However, this does seem like a promising area for future research.
 
+\subsection{Filters to be implemented}
+This section will cover the different systems that will feed into the gradient boosting algorithm.
+Each of these will independently model, predict, and monitor the inputs and outputs of PLCs and sensors.
+
+The first filter here will be a simple majority filter.
+Given an odd number of redundant PLCs, the filter will select the median value of the PLCs.
+The standard deviation of the output will be measured online, and this estimate will be continually improved as the system runs.
+Any PLCs deviating from the median value past a certain multiple of the standard deviation will be marked as faulty.
+
 \section{Related Works} \label{sec:related}
 False data injection detection is very much still an open research area.
 A lot of work has been done in it for the specific case of large power grid systems, beginning with the work by Yao which demonstrated that a family of attacks were possible which were undetectable from normal power grid operation from the standpoint of state estimation \cite{liu2011false}.
