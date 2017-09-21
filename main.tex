@@ -18,7 +18,9 @@
 \thispagestyle{empty}
 
 \begin{abstract}
-
+We are developing a solution that uses an ensemble of modelling methods to detect sensor and PLC compromises/failures.
+These different methods are combined together using gradient boosting to produce a highly robust filter.
+Various other novelties in our approach are mentioned as well.
 \end{abstract}
 
 \section{Introduction}
@@ -92,10 +94,17 @@ However, this does seem like a promising area for future research.
 This section will cover the different systems that will feed into the gradient boosting algorithm.
 Each of these will independently model, predict, and monitor the inputs and outputs of PLCs and sensors.
 
-The first filter here will be a simple majority filter.
+One filter will be a simple majority filter.
 Given an odd number of redundant PLCs, the filter will select the median value of the PLCs.
 The standard deviation of the output will be measured online, and this estimate will be continually improved as the system runs.
 Any PLCs deviating from the median value past a certain multiple of the standard deviation will be marked as faulty.
+
+Another filter will be use least means square to estimate the control system, and each PLC using third order models.
+The filter will constantly accept new data to improve its estimates, and it will also maintain some confidence value for the accuracy of the parameters.
+A PLC whose parameters deviate noticeably from those of the others, or whose signal violates its own predicted signal by a noticeable margin, will be marked as faulty.
+
+A third filter will attempt to use time delay neural networks to model the system, PLCs, and sensors.
+It will attempt to classify the signal at any moment as belonging either within stable operation, or as belonging to a compromised or failed device.
 
 \section{Related Works} \label{sec:related}
 False data injection detection is very much still an open research area.
