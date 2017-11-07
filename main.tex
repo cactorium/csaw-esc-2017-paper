@@ -82,17 +82,26 @@ However, they make the further assumption that the control system can be represe
 The state estimation uses an error correcting step, which uses the linearity of the system to solve for and correct a finite number of errors by using data collected from a finite number of time steps of the system.
 
 Mishra et al examine state estimation for control systems under attack by a static adversary in the presence of Gaussian measurement noise \cite{noise}.
+They follow a similar argument as Fawzi et al, assuming the control system is linear, and perform a brute force search over all the sensor subsets to determine the set that most likely matches reality.
+They prove that their approach provides optimal protection against attacks, and then extend their results to nonlinear systems to show it that a similar approach is possible there.
 
-%% TODO: add more
+Shoukry et al employ a vastly different approach to more efficiently solve for the system state estimate than in previous works \cite{modulo}.
+They note that previous approaches either did not provide complete protection, or suffered from an explosion in time complexity because they try to enumerate every potential combination of uncompromised sensors.
+Their approach solves the problem by using a combination of a SAT solver and a theory solver to determine the sensors that are more likely to be under attack and then calculating the current system state based on that knowledge.
+The SAT solver tries to guess which sensors are under attack, and then the theory solver acts to provide further constraints to avoid contradictions when the SAT solver guesses wrong.
+The authors prove that this system is both guaranteed to terminate under some fairly loose conditions, and then further optimize it to improve execution time.
+They develop some heuristics to accelerate the search for the subset of sensors that are under attack, and benchmark them to examine their performance characteristics.
+Their approach proves to be substantially faster and scalable to larger numbers of sensors compared to methods in prior works.
 
 \section{Background} \label{sec:bg}
-Our approach towards this problem draws more from signal processing instead of cybersecurity.
-We attempt to frame the problem as a classification problem, trying to distinguish signals originating in normal operation from those originating in compromised devices.
+Our approach towards this problem differs from the signal processing branch, where it becomes an optimal control theory problem, and from cybersecurity, where it becomes a network security problem.
+We attempt to frame the problem as a machine learning classification problem, trying to distinguish signals originating in normal operation from those originating in compromised devices.
 Nothing else is assumed of the signals other than that some of them will be attempting to maintain their particular values near their respective setpoints.
 The largest problems faced with this approach are that the signals will probably not vary too greatly from the setpoint, making it hard to collect useful data to prevent machine learning algorithms from overfitting, and that there is comparatively little data being collected during online operation for the machine learning algorithms to learn from.
 
 Consequently, it seems sensible to use a diverse set of machine learning algorithms to improve the chances of one or more of them working for a specific control system.
-%% TODO: add more info about the machine learning algorithms
+This would hopefully mean that one or more of the algorithms chosen will perform well for a given system, and then could be used as the primary classifiers for that system.
+This step of the process can be performed using adaptive boosting, a meta algorithm that is known to perform well and to be more resistant to overfitting than other algorithms \cite{adaboost}.
 
 \section{Implementation} \label{sec:impl}
 \begin{figure*}
@@ -218,10 +227,15 @@ The first one was a model of a coffee making plant, and the second was the fairl
 
 The first model was created specifically for this project (block diagram is in Figure \ref{fig:coffee} and Simulink model is in Figure \ref{fig:coffee_simulink}).
 Although it is meant to model the process involved in creating bottles of brewed coffee, the structure should be similar to other industrial plants where some reaction takes place between two reactants within some temperature range, along with some preprocessing of both of the reactants.
+It also have the distinction of not being covered by the methods mentioned in the related works; those methods assumed a linear control equation, whereas this system uses bang-bang control, which is still used in systems where the precision and expension of precisely controlled actuators are not needed.
 The model includes assertions within the subsystems, so that the model will stop with an error if any invalid conditions occur.
 These errors include any of the various tanks overflowing or underflowing, or the coffee roaster not reaching the desired temperature range before coffee beans are added.
 
-%% TODO: talk about Tennessee Eastman
+The Tennessee Eastman model is a model of a chemical plant that been a popular choice in control systems papers \cite{te0,te1,te2,te3,te4}.
+This system is modelled after a real life chemical plant with a large assortment of reactors, sensors, actuators, using flow rates and reaction rates.
+Consequently, it has proven effective in demonstrating the practicality of various control system theories.
+Several Simulink models of the system already existed, so one of those was chosen to use in this project.
+A recent, modernized revision of the model was used, which luckily had all of the control logic clearly and neatly separated from the system model \cite{te_revised}.
 
 \section{Discussions}\label{sec:discussion}
 This system uses many separate, fairly robust, well studied algorithms as a result of the very general nature of the problem it is attempting to solve.
