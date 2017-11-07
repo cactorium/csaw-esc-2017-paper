@@ -24,12 +24,20 @@ Various other novelties in our approach are mentioned as well.
 \end{abstract}
 
 \section{Introduction}
-The CSAW 2017 Embedded Security Challenge focuses on security industrial control systems against attacks on PLCs and sensors.
+The CSAW 2017 Embedded Security Challenge focuses on security industrial control systems against attacks on programmable logic controllers (PLCs) and sensors.
 The challenge is based around the problem of securing a system built on top of legacy PLCs.
 These PLCs will be running code that we will not have access to, and consequently, they effectively act as black boxes that may or may not be controlled by the attacker.
 Similarly, the sensors may or may not be compromised by the attacker.
 Following Shannon's maxim, we assume the attacker has an almost perfect knowledge of the system, in terms of its implementation, aside from not knowing some set of secrets.
 The goal overall is to deploy a system on top of the existing infrastructure to mitigate an attacker's ability to cause the system to break by allowing it to enter an unsafe state.
+
+Control systems offer an unusual attack surface compared to other modern systems.
+The use of legacy communications systems often means that control system must be air gapped to prevent attackers from hijacking the unencrypted and sometimes unauthenticated communication between the control center and the controllers.
+For example, the Modbus standard, one of the more commonly used standards for PLC to SCADA communications, lacks any authentication features \cite{modbus}.
+The PLCs themselves differ greatly between manufacturers, with each manufacturer including their own vendor-specific extensions functions to IEC 61131-3, the standard that specifies five languages that PLC programs can be written in.
+Many of the PLCs expose different administrative panels, some of which are known to have vulnerabilities \cite{metasploit}.
+Some approaches to secure PLCs through introducing hardened MCUs or improved protocols run into the fact that such changes would be unlikely to be accepted by industry, as they would mean costly and risky replacements of important parts of their systems.
+Consequently, our attempt to defend PLCs tries not to make too many assumptions about the low-level properties of the devices, treating them as black boxes that may or may not be functioning correctly.
 
 There are two different forms of attacks, attacks that alter the output of a PLC, and attacks that alter the outputs of sensors in the system.
 Our defense against both of these consists of providing predictors that try to predict the future state of the system, estimators that support the predictors by estimating unknown hidden variables, and classifiers that use the predictions and estimations to determine whether a given deviation should be classified as an attack or failure.
@@ -40,10 +48,25 @@ Apart from sharing this basic framework, PLC outputs and sensor outputs will als
 \section{Related Works} \label{sec:related}
 False data injection detection is very much still an open research area.
 A lot of work has been done in it for the specific case of large power grid systems, beginning with the work by Yao which demonstrated that a family of attacks were possible which were undetectable from normal power grid operation from the standpoint of state estimation \cite{liu2011false}.
-Various other papers devised methods to overcome this shortcoming \cite{bobba2010detecting}.
+Various other papers devised methods to overcome this shortcoming, such as by choosing a small subset of sensors that could be protected to prevent false data injection attacks \cite{bobba2010detecting}.
 
-The 
+Cardenas et al noted that defenses in control systems tended to focus on generating a handful of carefully designed metrics, each of which would attempt to detect one particular type of failure mode for the system \cite{attacks}.
+This meant that the system was only secure if every failure mode was accounted for, leaving room for human error, especially given how the complexity of control systems often means different components can interact in complicated ways that would not at all be straightforward to predict.
+The publication advises the development of more robust attack-detection algorithms, as well as building attack tolerance into the control systems themselves.
+They focus their defense on defending against integrity attacks, their name for attacks that alter sensor data.
+They define three different types of stealthy attacks, surge attacks (where the attacker attempts to do as much damage without being detected as soon as they gain access to the system), bias attacks (where the attacker adds a small constant to the value of their compromised sensor), and geometric attacks (where the attacker causes their compromised sensor to drift exponentially away from its correct value).
 
+Fawzi et al develop a general approach to building attack-resiliant control systems \cite{secureestimation}.
+In order to do this they develop a robust state estimation algorithm that could provide a best estimate of the real state of the system that was inspired by error correction algorithms.
+They then show how such a state estimation can be translated into control system stabilization, and thus the state estimation algorithm developed in the first part of the publication can be the basis of a robust control system, assuming some sort of feedback occurs within the control system.
+The formal model they use closely matches that used in this paper.
+They assume that an attacker controlled a small number of sensors and controllers within the system, and that the attacker can arbitrarily alter the values generated in the places they control.
+However, they make the further assumption that the control system can be represented exactly as a linear system, which differs from this paper, where it is considered to be a black box.
+The state estimation uses an error correcting step, which uses the linearity of the system to solve for and correct a finite number of errors by using data collected from a finite number of time steps of the system.
+
+\section{Background} \label{sec:bg}
+Our approach towards this problem draws more from signal processing instead of cybersecurity.
+%% TODO: add more
 
 \section{Implementation} \label{sec:impl}
 The project can be separated into a testing framework integrating MATLAB that allows control systems built in Simulink to be used as test platforms, and the actual protection system used to detect and warn about potential attacks on the simulated control system.
@@ -55,8 +78,31 @@ The PLC is connected using a set of Simulink blocks created during this project 
 These blocks are written in C, using MATLAB's S-block functionality, and use \texttt{libmodbus} to communicate using Modbus TCP.
 Each block keeps track of real time as well as simulation time, so that they can ensure the simulation stays in time with real world time.
 All communication past this point is done using Modbus TCP.
+
+\begin{figure*}
+  \centering
+  \includegraphics[width=0.8\textwidth]{csaw2017architecture.png}
+  \label{fig:arch}
+  \caption{High level overview of the test framework}
+\end{figure*}
+
 MATLAB's Simulink PLC Coder was used to generate IEC61131-3 Structured Text function blocks, which were fed into a code generator that produces Structured Text code that would simulate a set of simulated PLCs.
 This step basically involves creating multiple instances of the function block and feeding inputs and outputs correctly to each of them.
+
+\begin{figure}
+  \centering
+  \includegraphics[width=\columnwidth]{csaw2017sensorwrite.png}
+  \label{fig:write}
+  \caption{Communication done during a sensor write request}
+\end{figure}
+
+\begin{figure*}
+  \centering
+  \includegraphics[width=\textwidth]{csaw2017plcread.png}
+  \label{fig:read}
+  \caption{Communication done during a PLC output read request}
+\end{figure*}
+
 
 A stack of Modbus proxies, with OpenPLC's Modbus slave endpoint at the bottom, provides the combination of attack simulation and defense testing.
 The Simulink blocks communicate with the top of the stack, which then forwards the request down in the stack, while potentially altering the request or response.
@@ -72,13 +118,19 @@ The defense module proxies requests to the other attack module, which simulates 
 In this attack module, the responses from the PLC are altered during PLC output read requests.
 This module then communicates directly to the OpenPLC Modbus slave, completing the connection between the Simulink system and the PLC logic.
 
+\begin{figure}
+  \centering
+  \includegraphics[width=\columnwidth]{csaw2017workflow.png}
+  \label{fig:workflow}
+  \caption{Workflow for model testing}
+\end{figure}
+
 A lot of the complexity in this system is primarily meant to make it possible to use many existing tools and knowledge to build the control systems that are to be tested.
 The first step in preparing a system for testing is to either create or find a Simulink model for it.
 This model is then used to generate the PLC code, and then it is also slightly modified to allow it to function with the rest of the test framework.
 This is a fairly simple procedure, and thus testing PLC security using this framework could potentially be easily integrated into existing engineering design workflows fairly easily.
 
-\subsection{Defense module} \label{sec:def}
-%% TODO
+\subsection{Defense Module} \label{sec:def}
 Our method builds on top of the current standard for using redundancy to improve system reliability, enhancing it to be more robust.
 Our system shold be able to withstand some attacks where the attacker controls a majority of the controllers, and can detect some attacks on the sensors within the system as well.
 In an attempt to provide a robust, general solution that can reliably detect a large number of attacks than simple majority voting can't.
@@ -113,6 +165,16 @@ A PLC whose parameters deviate noticeably from those of the others, or whose sig
 
 A third filter will attempt to use time delay neural networks to model the system, PLCs, and sensors.
 It will attempt to classify the signal at any moment as belonging either within stable operation, or as belonging to a compromised or failed device.
+
+\subsection{Test Models}\label{sec:models}
+Two models have been modified to work for this project.
+The first one was a model of a coffee making plant, and the second was the fairly well known Tennessee Eastman acrylic plant model.
+
+The first model was created specifically for this project.
+Although it is meant to model the process involved in creating bottles of brewed coffee, the structure should be similar to other industrial plants where some reaction takes place between two reactants within some temperature range, along with some preprocessing of both of the reactants.
+The model includes assertions within the subsystems, so that the model will stop with an error if any invalid conditions occur.
+These errors include any of the various tanks overflowing or underflowing, or the coffee roaster not reaching the desired temperature before coffee beans start flowing through it.
+% TODO: ref to figures
 
 \section{Discussions}\label{sec:discussion}
 This system uses many separate, fairly robust, well studied algorithms as a result of the very general nature of the problem it is attempting to solve.
