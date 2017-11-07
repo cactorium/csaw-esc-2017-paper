@@ -37,7 +37,48 @@ The predictors and estimators here will be a combination of some of the ones com
 This ensemble of classifiers will be combined together using gradient boosting to provide a hopefully robust single classifier that can accurately detect attacks.
 Apart from sharing this basic framework, PLC outputs and sensor outputs will also have some additional security measures that take advantage of their individual attributes.
 
-\section{Proposal}
+\section{Related Works} \label{sec:related}
+False data injection detection is very much still an open research area.
+A lot of work has been done in it for the specific case of large power grid systems, beginning with the work by Yao which demonstrated that a family of attacks were possible which were undetectable from normal power grid operation from the standpoint of state estimation \cite{liu2011false}.
+Various other papers devised methods to overcome this shortcoming \cite{bobba2010detecting}.
+
+The 
+
+
+\section{Implementation} \label{sec:impl}
+The project can be separated into a testing framework integrating MATLAB that allows control systems built in Simulink to be used as test platforms, and the actual protection system used to detect and warn about potential attacks on the simulated control system.
+In a real life use case, essentially everything could be stripped out of the system except for the defense module, which would act as it does now as a proxy between the control system and the PLCs.
+
+\subsection{Test Framework} \label{sec:test}
+The control system is simulated using MATLAB on a separate computer using Simulink.
+The PLC is connected using a set of Simulink blocks created during this project that can translate Simulink signals into Modbus commands.
+These blocks are written in C, using MATLAB's S-block functionality, and use \texttt{libmodbus} to communicate using Modbus TCP.
+Each block keeps track of real time as well as simulation time, so that they can ensure the simulation stays in time with real world time.
+All communication past this point is done using Modbus TCP.
+MATLAB's Simulink PLC Coder was used to generate IEC61131-3 Structured Text function blocks, which were fed into a code generator that produces Structured Text code that would simulate a set of simulated PLCs.
+This step basically involves creating multiple instances of the function block and feeding inputs and outputs correctly to each of them.
+
+A stack of Modbus proxies, with OpenPLC's Modbus slave endpoint at the bottom, provides the combination of attack simulation and defense testing.
+The Simulink blocks communicate with the top of the stack, which then forwards the request down in the stack, while potentially altering the request or response.
+In this way, the first attack proxy can alter sensor input by modifying sensor data write requests it receives from MATLAB.
+This allows attacks that modify the sensor inputs to the PLCs to be simulated.
+
+After this first proxy is the defense module.
+During sensor write data requests the defense module duplicates the sensor data so that each simulated PLC will receive its sensor data, and also keeps a sample of the sensor data for attack detection.
+When the control system tries to read the PLC output, the defense module duplicates that request as well, but modifies the response so that the control system receives whatever response it deems correct.
+The exact details of this module will be discussed further in this paper.
+
+The defense module proxies requests to the other attack module, which simulates attacks on PLCs.
+In this attack module, the responses from the PLC are altered during PLC output read requests.
+This module then communicates directly to the OpenPLC Modbus slave, completing the connection between the Simulink system and the PLC logic.
+
+A lot of the complexity in this system is primarily meant to make it possible to use many existing tools and knowledge to build the control systems that are to be tested.
+The first step in preparing a system for testing is to either create or find a Simulink model for it.
+This model is then used to generate the PLC code, and then it is also slightly modified to allow it to function with the rest of the test framework.
+This is a fairly simple procedure, and thus testing PLC security using this framework could potentially be easily integrated into existing engineering design workflows fairly easily.
+
+\subsection{Defense module} \label{sec:def}
+%% TODO
 Our method builds on top of the current standard for using redundancy to improve system reliability, enhancing it to be more robust.
 Our system shold be able to withstand some attacks where the attacker controls a majority of the controllers, and can detect some attacks on the sensors within the system as well.
 In an attempt to provide a robust, general solution that can reliably detect a large number of attacks than simple majority voting can't.
@@ -46,7 +87,7 @@ These of these approaches will individually calculate the likelihood of a failin
 These approaches will include modeling the PLCs as time delay neural networks, hidden Markov models, and low order control systems, using simple majority voting, and classifying their behavior using support vector machines.
 After some experimentation, some of the lower scoring approaches may be pruned to improve the performance of the system.
 
-\subsection{Security mechanisms exclusive to PLCs}
+\subsubsection{Security mechanisms exclusive to PLCs}
 Only one, if any, of the PLCs, will be virtually connected to the plant at any moment.
 All the PLCs will receive sensor data for each time step, but only the output of one of them will actually be fed into the actuators in the system.
 If the system predicts that an attacker has assumed complete control over all the PLCs, the system will temporarily switch into running using the predictors and estimators described above.
@@ -57,40 +98,7 @@ In particular, this will prevent some of the machine learning algorithms from ov
 It is expected that the systems are probably naturally fairly stable, and consequently most of the data collected will be of the system working at or near its set point.
 Emulating disturbances allows a more complex model that more accurately predicts system behavior to be developed.
 
-\subsection{Security mechanisms exclusive to sensors}
-Following prior work, watermarking signals are added to the actuator values (when the actuator is analog).
-Assuming the signal is linear to some extent, it is expected that some amount of this signal will leak into the sensor data.
-This will prevent some classes of false data injection on the sensors, as the watermarking signals will be made to be spoof resistant, as will be explained below.
-The watermarking signals will be very weak in nature, with a power level near noise floor of the system.
-The use of spread spectrum coding will allow this to still be detected, only at the cost at requiring a longer time window to do so.
-The signal strength, window size, and coding will all be adaptively adjusted to individual control systems.
-
-The signal will be generated using Gold codes, a class of pseudorandom sequences which tend to have very good autocorrelation and cross correlation properties.
-These codes are generated using two distinct maximum length sequences of the same period.
-The starting point of the Gold code and the amount the maximum length sequences are shifted relative to each other provide a pair of secret values that someone attempting to capture the signal would need to determine.
-In most systems, these values are shared prior to an attempt to use the channel to communicate.
-It would take $O(n^2)$ operations to determine these two parameters via brute force, where $n$ is the period of the Gold code.
-
-This system will use chip modulation, where a fast, pseudorandom code is phase shifts the information that is being sent.
-This spreads out the signal to cover a wider bandwidth, making it easier to recover at higher signal to noise rates, at the cost of lowering the information rate.
-
-Let's examine the case where both the chip code and the information code are Gold codes.
-This would mean the controller would need to keep track of four parameters and perform twice as many XOR operations.
-However, the effect on the attacker is more drastic.
-The attacker, who is attempting to recover the parameters, would require $O(n^4)$ operations to brute force the parameters.
-
-So let's examine if this chip modulated Gold code was used to modulate another Gold code.
-We'll use the simplifying assumption that this Gold code is of the same period as the first two.
-Then the controller would need to keep track of six parameters and perform three times as many XOR operations as in the first case.
-More interestingly, the attacker is faced with $O(n^6)$ operations to recover the parameters now.
-
-This shows that a linear increase in work for the controller results in an exponentially large amount of work for the attacker, something that is very reminiscent of private keys and secrets in cryptography.
-A sufficiently large layering of sequences with a sufficiently large period should provide enough security to prevent an attacker from spoofing the signal.
-This kind of signal would normally be close to useless, as each additional layer causes an exponential slowdown of the information transmission, but this works perfectly for this use case, where all that matters is the presence of a signal.
-This unfortunately only provides some small amount of protection here, as the attacker still has plenty of ways of altering the sensor data without disrupting the watermarking signal.
-However, this does seem like a promising area for future research.
-
-\subsection{Filters to be implemented}
+\subsubsection{Filters to be implemented}
 This section will cover the different systems that will feed into the gradient boosting algorithm.
 Each of these will independently model, predict, and monitor the inputs and outputs of PLCs and sensors.
 
@@ -106,16 +114,24 @@ A PLC whose parameters deviate noticeably from those of the others, or whose sig
 A third filter will attempt to use time delay neural networks to model the system, PLCs, and sensors.
 It will attempt to classify the signal at any moment as belonging either within stable operation, or as belonging to a compromised or failed device.
 
-\section{Related Works} \label{sec:related}
-False data injection detection is very much still an open research area.
-A lot of work has been done in it for the specific case of large power grid systems, beginning with the work by Yao which demonstrated that a family of attacks were possible which were undetectable from normal power grid operation from the standpoint of state estimation \cite{liu2011false}.
-Various other papers devised methods to overcome this shortcoming \cite{bobba2010detecting}.
-
 \section{Discussions}\label{sec:discussion}
 This system uses many separate, fairly robust, well studied algorithms as a result of the very general nature of the problem it is attempting to solve.
 Industrial control systems are very diverse, and consequently any attempt to protect them in a general case must be very robust to adequately work in a large number of systems.
 It isn't expected that any one of these algorithms can adequately model all control systems, but it is expected that at least some of them will perform well enough for all control systems.
 The gradient boosting performed acts to select the set of algorithms that work well for each system.
+
+\section{Future Work}\label{sec:future}
+One very promising alternative approach towards control system security would be to use a variation of generative adversarial networks to potentially discover and learn new possible attacks much more quickly than the previous set up.
+In the canonical generational adversarial network setup, one algorithm is learning to forge something, while the other algorithm is learning how to distinguish forgeries from the real product \cite{gan}. %% TODO: cite
+The objective in that case was to train the generative model to produce articles that are nearly indistinguishable from the real thing, whereas in this case there would be a few subtle changes to use the same basic idea to develop a model that can detect increasingly deceptive attacks, as well as a model that develops increasingly stealthy attacks.
+This would be done by adjusting the algorithm slightly.
+Thus, instead of attempting to just fool the defense module, the generative model would also be scored on how effective the attacks that went undetected were.
+Some score, such as the total amount the state variables of the system deviated from their setpoints, could be used here.
+The defense module would be given a sample of data from both sensors and the PLC outputs, and would try to determine whether this was from normal operation or from some type of attack.
+Over time, the generative model should learn how to generate more sophisticated data modifications to try to fool the defense module, and the defense module should learn how to deal with more covert attacks.
+
+This idea was discovered fairly late in the process, and thus was not completed by the deadline for this paper.
+This may or may not be finished by the time of the competition.
 
 \section{Conclusion} \label{sec:conclusion}
 TBD
