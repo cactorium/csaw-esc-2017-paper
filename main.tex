@@ -18,8 +18,8 @@
 \thispagestyle{empty}
 
 \begin{abstract}
-Aging and legacy control systems suffer from increasingly urgent threat from cyberattacks.
-It is often difficult, expensive, or impossible to upgrade these legacy systems to reduce the threat of attack.
+Aging and legacy control systems suffer from an increasingly urgent threat from cyberattacks.
+However, it is often difficult, expensive, or impossible to upgrade these legacy systems to reduce the threat of attack.
 Thus, it makes more sense to develop defense modules that can be added to these legacy systems to improve their resilence under the threat of cyberattack.
 
 We develop a control system testing framework as well as a defense module that relies on a robust attack detection algorithm.
@@ -47,7 +47,7 @@ Many of the PLCs expose different administrative panels, some of which are known
 Some approaches to secure PLCs through introducing hardened MCUs or improved protocols run into the fact that such changes would be unlikely to be accepted by industry, as they would mean costly and risky replacements of important parts of their systems.
 Consequently, our attempt to defend PLCs tries not to make too many assumptions about the low-level properties of the devices, treating them as black boxes that may or may not be functioning correctly.
 
-There are two different forms of attacks, attacks that alter the output of a PLC, and attacks that alter the outputs of sensors in the system.
+There are two different forms of attacks, attacks that alter the output of the PLCs, and attacks that alter the outputs of sensors in the system.
 Our defense against both of these consists of providing predictors that try to predict the future state of the system, estimators that support the predictors by estimating unknown hidden variables, and classifiers that use the predictions and estimations to determine whether a given deviation should be classified as an attack or failure.
 The predictors and estimators here will be a combination of some of the ones commonly found in control theory and those used in machine learning.
 This ensemble of classifiers will be combined together using gradient boosting to provide a hopefully robust single classifier that can accurately detect attacks.
@@ -59,6 +59,8 @@ Overall, our contributions are:
 \item A (hopefully) robust algorithm for detecting attacks using a combination of many individual classifiers.
   This will be performant enough to run on a Raspberry Pi without affecting its ability to also act as a PLC.
 \end{itemize}
+
+This paper will first discuss the current state of the art in control system defense, then it will discuss the process through which the defense module was developed, followed by details of the system's implementation, some further discussion of the design, and then the conclusion.
 
 \section{Related Works} \label{sec:related}
 False data injection detection is very much still an open research area.
