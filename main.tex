@@ -18,10 +18,17 @@
 \thispagestyle{empty}
 
 \begin{abstract}
-We are developing a solution that uses an ensemble of modelling methods to detect sensor and PLC compromises/failures.
+Aging and legacy control systems suffer from increasingly urgent threat from cyberattacks.
+It is often difficult, expensive, or impossible to upgrade these legacy systems to reduce the threat of attack.
+Thus, it makes more sense to develop defense modules that can be added to these legacy systems to improve their resilence under the threat of cyberattack.
+
+We develop a control system testing framework as well as a defense module that relies on a robust attack detection algorithm.
+The testing framework may be used to test both attacks and defenses on control systems, and is integrated with Simulink to allow for ease of use and integration into existing design workflows.
+The framework is designed to be extensible and to work with any programmable logic controller that provides a Modbus TCP slave interface, potentially allowing testing on the hardware that could be used in production.
+
+The defense module acts as a wrapper for the programmable logic controllers, exposing a Modbus TCP slave interface that the control system is connected to.
+The attack detection algorithm uses a diverse ensemble of machine learning algorithms, each of which is independently trying to detect unusual activity from both the sensor data and the actuator commands from the PLCs.
 These different methods are combined together using gradient boosting to produce a highly robust filter.
-Various other novelties in our approach are mentioned as well.
-%% TODO: rewrite
 \end{abstract}
 
 \section{Introduction}
@@ -73,6 +80,7 @@ However, they make the further assumption that the control system can be represe
 The state estimation uses an error correcting step, which uses the linearity of the system to solve for and correct a finite number of errors by using data collected from a finite number of time steps of the system.
 
 Mishra et al examine state estimation for control systems under attack by a static adversary in the presence of Gaussian measurement noise \cite{noise}.
+
 %% TODO: add more
 
 \section{Background} \label{sec:bg}
@@ -82,7 +90,7 @@ Nothing else is assumed of the signals other than that some of them will be atte
 The largest problems faced with this approach are that the signals will probably not vary too greatly from the setpoint, making it hard to collect useful data to prevent machine learning algorithms from overfitting, and that there is comparatively little data being collected during online operation for the machine learning algorithms to learn from.
 
 Consequently, it seems sensible to use a diverse set of machine learning algorithms to improve the chances of one or more of them working for a specific control system.
-%% TODO: add more
+%% TODO: add more info about the machine learning algorithms
 
 \section{Implementation} \label{sec:impl}
 \begin{figure*}
@@ -209,7 +217,9 @@ The first one was a model of a coffee making plant, and the second was the fairl
 The first model was created specifically for this project (block diagram is in Figure \ref{fig:coffee} and Simulink model is in Figure \ref{fig:coffee_simulink}).
 Although it is meant to model the process involved in creating bottles of brewed coffee, the structure should be similar to other industrial plants where some reaction takes place between two reactants within some temperature range, along with some preprocessing of both of the reactants.
 The model includes assertions within the subsystems, so that the model will stop with an error if any invalid conditions occur.
-These errors include any of the various tanks overflowing or underflowing, or the coffee roaster not reaching the desired temperature before coffee beans start flowing through it.
+These errors include any of the various tanks overflowing or underflowing, or the coffee roaster not reaching the desired temperature range before coffee beans are added.
+
+%% TODO: talk about Tennessee Eastman
 
 \section{Discussions}\label{sec:discussion}
 This system uses many separate, fairly robust, well studied algorithms as a result of the very general nature of the problem it is attempting to solve.
